@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from setting.config import ModelArgs
+from utils import precompute_theta_pos_frequencies
 
 
 class Transformer(nn.Module):
@@ -22,7 +23,11 @@ class Transformer(nn.Module):
         self.norm = RMSNorm(args.dim, eps=args.norm_eps)
         self.output = nn.Linear(args.dim, args.vocab_size, bias=False)
 
-        self.freqs_complex = precompute_theta_pos_frequencies(self.args.dim // self.args.n_heads, self.args.max_seq_len * 2, device=self.args.device)
+        self.freqs_complex = precompute_theta_pos_frequencies(
+            self.args.dim // self.args.n_heads,
+            self.args.max_seq_len * 2,
+            device=self.args.device,
+        )
 
     def forward(self, tokens: torch.Tensor, start_pos: int):
         # (batch_size, seq_len)
@@ -30,10 +35,9 @@ class Transformer(nn.Module):
         assert seq_len == 1, "Only one tokens at a time is supported."
 
         # (batch_size, seq_len) -> (batch_size, seq_len, dim)
-        h = self.tok_embeddings(tokens)  
+        h = self.tok_embeddings(tokens)
 
-        freqs_complex = self.freqs_complex[start_pos:start_pos + seq_len]
-
+        freqs_complex = self.freqs_complex[start_pos : start_pos + seq_len]
 
         for layer in self.layers:
             h = layer(h, start_pos, freqs_complex)
@@ -41,5 +45,5 @@ class Transformer(nn.Module):
         h = self.norm(h)
 
         # (batch_size, seq_len, dim) -> (batch_size, seq_len, vocab_size)
-        output = self.output(h).float()  
+        output = self.output(h).float()
         return output
